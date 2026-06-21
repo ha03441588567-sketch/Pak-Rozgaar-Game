@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>92 Jeeto Mobile Portal</title>
+    <style>
+        :root { --dark-bg: #121212; --panel-bg: #1e1e1e; --gold: #ffcc00; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--dark-bg); color: #fff; text-align: center; margin: 0; padding: 15px; }
+        .app-container { max-width: 450px; margin: auto; background: var(--panel-bg); border-radius: 20px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .header-card { display: flex; justify-content: space-between; background: #2d2d2d; padding: 12px; border-radius: 12px; margin-bottom: 20px; }
+        .balance-text { color: #00ffcc; font-weight: bold; }
+        .timer-display { font-size: 28px; color: var(--gold); font-weight: bold; margin: 15px 0; }
+        .grid-layout { display: flex; justify-content: space-between; gap: 10px; margin: 20px 0; }
+        .color-btn { flex: 1; padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        .btn-green { background: #4CAF50; } .btn-red { background: #f44336; } .btn-violet { background: #9c27b0; }
+        .color-btn:active { transform: scale(0.95); }
+        .input-group { margin: 15px 0; }
+        input[type="number"] { width: 80%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #2c2c2c; color: #fff; text-align: center; font-size: 16px; }
+        .history-row { display: flex; justify-content: center; gap: 8px; margin-top: 15px; overflow-x: auto; padding: 10px; }
+        .history-circle { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header-card">
+        <div>👤 <span id="user-id">Loading...</span></div>
+        <div>💰 Balance: <span class="balance-text">Rs. <span id="user-balance">0</span></span></div>
+    </div>
+
+    <div>Round ID: <span id="round-id" style="color:var(--gold)">--</span></div>
+    <div class="timer-display">00:<span id="timer-box">30</span></div>
+
+    <div class="input-group">
+        <label>Enter Bet Amount (PKR):</label><br><br>
+        <input type="number" id="stake-amount" value="100" min="10">
+    </div>
+
+    <p>Tap to Predict next color:</p>
+    <div class="grid-layout">
+        <button class="btn-green color-btn" onclick="placeOrder('Green')">Green</button>
+        <button class="btn-violet color-btn" onclick="placeOrder('Violet')">Violet</button>
+        <button class="btn-red color-btn" onclick="placeOrder('Red')">Red</button>
+    </div>
+
+    <h3>Recent Trends</h3>
+    <div class="history-row" id="trends-box"></div>
+</div>
+
+<script>
+    const API_URL = "http://localhost:5000/api";
+    const userPhone = "923001234567"; // Active session identity profile placeholder
+
+    async function syncProfile() {
+        let res = await fetch(`${API_URL}/get-profile`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: userPhone })
+        });
+        let data = await res.json();
+        if(data.success) {
+            document.getElementById('user-id').textContent = data.profile.name;
+            document.getElementById('user-balance').textContent = data.profile.balance;
+        }
+    }
+
+    async function updateGameEngine() {
+        try {
+            let res = await fetch(`${API_URL}/game-state`);
+            let data = await res.json();
+            
+            document.getElementById('round-id').textContent = data.round;
+            document.getElementById('timer-box').textContent = data.timer < 10 ? "0" + data.timer : data.timer;
+
+            // Render Historical Visualizers
+            let trendsBox = document.getElementById('trends-box');
+            trendsBox.innerHTML = "";
+            data.history.forEach(color => {
+                let node = document.createElement('div');
+                node.className = "history-circle";
+                node.style.backgroundColor = color === 'Green' ? '#4CAF50' : color === 'Red' ? '#f44336' : '#9c27b0';
+                node.textContent = color[0];
+                trendsBox.appendChild(node);
+            });
+
+            // Agar timer 0 ho toh user profile auto-sync karein taake winning balance update ho
+            if(data.timer === 29) { syncProfile(); }
+
+        } catch (e) { console.log("Reconnecting to backend..."); }
+    }
+
+    async function placeOrder(colorSelection) {
+        let betCash = parseInt(document.getElementById('stake-amount').value);
+        
+        let res = await fetch(`${API_URL}/place-bet`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: userPhone, color: colorSelection, amount: betCash })
+        });
+        let responseLog = await res.json();
+        
+        alert(responseLog.message);
+        if(responseLog.success) {
+            document.getElementById('user-balance').textContent = responseLog.newBalance;
+        }
+    }
+
+    // Initializations
+    syncProfile();
+    setInterval(updateGameEngine, 1000);
+</script>
+
+</body>
+</html>
